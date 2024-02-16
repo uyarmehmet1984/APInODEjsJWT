@@ -122,6 +122,58 @@ function verifyToken(req, res, next) {
     next();
   });
 }
+// ...
+
+app.get('/users', async (req, res) => {
+  try {
+    const { page = 1, pageSize = 10, filter = '', search = '' } = req.query;
+
+    // Veritabanından kullanıcıları çek
+    let query = 'SELECT * FROM user';
+
+    // Filtreleme
+    if (filter && filter !== 'all') {
+      query += ` WHERE is_verified = ${filter === 'verified' ? 1 : 0}`;
+    }
+
+    // Arama
+    if (search) {
+      query += ` ${filter && filter !== 'all' ? 'AND' : 'WHERE'} (name LIKE '%${search}%' OR email LIKE '%${search}%')`;
+    }
+
+    // Sayfalama
+    const offset = (page - 1) * pageSize;
+    query += ` LIMIT ${pageSize} OFFSET ${offset}`;
+
+    connection.query(query, async (error, results) => {
+      if (error) throw error;
+
+      // Toplam kullanıcı sayısını al
+      const countQuery = 'SELECT COUNT(*) as totalCount FROM user';
+      connection.query(countQuery, (countError, countResults) => {
+        if (countError) throw countError;
+
+        const totalCount = countResults[0].totalCount;
+
+        // Sayfalama bilgileri
+        const totalPages = Math.ceil(totalCount / parseInt(pageSize));
+
+        // Sonucu döndür
+        res.json({
+          users: results,
+          currentPage: parseInt(page),
+          pageSize: parseInt(pageSize),
+          totalPages: totalPages,
+          totalCount: totalCount
+        });
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası.' });
+  }
+});
+
+// ...
 
 
 // Uygulamayı belirtilen portta dinle
